@@ -1,7 +1,8 @@
-import {store} from './store.js?v=20261116b';
-import {escape,icon,formatDate,formatTime} from './ui.js?v=20261116b';
-import {renderStudent,bindStudent,setSearch,resetStudentView} from './student.js?v=20261116b';
-import {renderStaff,bindStaff,resetStaffView} from './staff.js?v=20261116b';
+import {store} from './store.js?v=20261116c';
+import {escape,icon,formatDate,formatTime} from './ui.js?v=20261116c';
+import {renderStudent,bindStudent,setSearch,resetStudentView} from './student.js?v=20261116c';
+import {renderStaff,bindStaff,resetStaffView} from './staff.js?v=20261116c';
+import {BRAND} from './assets.js?v=20261116c';
 
 const app=document.querySelector('#app');
 const dialog=document.querySelector('#modal');
@@ -16,7 +17,7 @@ const staffNav={
   partner:[['/partner','briefcase','Opportunities']],
   admin:[['/admin','chart','Overview'],['/advisor','shield','Service review'],['/organizer','calendar','Club management']]
 };
-const schoolMark=`<span class="brand-mark">${icon('school',22)}</span>`;
+const schoolMark=`<span class="brand-mark"><img src="${escape(BRAND.src)}" alt="" width="382" height="471"></span>`;
 
 function focusSelector(element){
   if(!element||!app.contains(element))return null;
