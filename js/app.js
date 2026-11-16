@@ -1,7 +1,7 @@
-import {store} from './store.js';
-import {escape,icon,formatDate,formatTime} from './ui.js';
-import {renderStudent,bindStudent,setSearch,resetStudentView} from './student.js';
-import {renderStaff,bindStaff,resetStaffView} from './staff.js';
+import {store} from './store.js?v=20261116b';
+import {escape,icon,formatDate,formatTime} from './ui.js?v=20261116b';
+import {renderStudent,bindStudent,setSearch,resetStudentView} from './student.js?v=20261116b';
+import {renderStaff,bindStaff,resetStaffView} from './staff.js?v=20261116b';
 
 const app=document.querySelector('#app');
 const dialog=document.querySelector('#modal');

@@ -1,4 +1,4 @@
-import { createSeed, DEMO_NOW } from './seed.js';
+import { createSeed, DEMO_NOW } from './seed.js?v=20261116b';
 
 export const STORAGE_KEY = 'campus-connect.demo.v1';
 const VERSION = 1;

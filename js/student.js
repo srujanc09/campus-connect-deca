@@ -1,6 +1,6 @@
-import {escape as esc,icon,formatDate,formatTime,dateParts,empty,download,csvCell} from './ui.js';
-import {DEMO_NOW} from './seed.js';
-import {asset} from './assets.js';
+import {escape as esc,icon,formatDate,formatTime,dateParts,empty,download,csvCell} from './ui.js?v=20261116b';
+import {DEMO_NOW} from './seed.js?v=20261116b';
+import {asset} from './assets.js?v=20261116b';
 
 let discoveryTab='clubs',query='',category='All',savedOnly=false,calendarMode='month',personalOnly=false,calendarCategory='All',calendarMonth=10,calendarYear=2026,discoveryPage=1;
 const activeStudent=(s,p)=>s.students.find(x=>x.id===p.studentId)||s.students[0];

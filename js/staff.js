@@ -1,5 +1,5 @@
-import { escape, icon, formatDate, formatTime } from './ui.js';
-import { DEMO_NOW } from './seed.js';
+import { escape, icon, formatDate, formatTime } from './ui.js?v=20261116b';
+import { DEMO_NOW } from './seed.js?v=20261116b';
 
 const initialView = () => ({ organizerTab: 'events', serviceTab: 'pending', adminTab: 'overview', selectedEventId: null, selectedLogId: null, organizerPage: 1, servicePage: 1, rosterPage: 1 });
 const local = initialView();
