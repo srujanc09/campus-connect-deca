@@ -7,8 +7,8 @@ export const ASSETS = {
   },
   technology: {
     src: './assets/images/technology.jpg',
-    alt: 'Electronic components on a circuit board',
-    position: '50% 58%'
+    alt: 'Close-up photograph of a blue circuit board and microcontroller',
+    position: '50% 50%'
   },
   service: {
     src: './assets/images/service.jpg',
@@ -22,8 +22,8 @@ export const ASSETS = {
   },
   leadership: {
     src: './assets/images/leadership.jpg',
-    alt: 'Colorful planning notes arranged on a whiteboard',
-    position: '53% 47%'
+    alt: 'Handwritten planning notes on a team whiteboard',
+    position: '45% 44%'
   },
   athletics: {
     src: './assets/images/athletics.jpg',

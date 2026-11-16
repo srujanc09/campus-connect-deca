@@ -7,6 +7,7 @@ const app=document.querySelector('#app');
 const dialog=document.querySelector('#modal');
 let present=new URLSearchParams(location.search).get('present')==='1';
 let toastTimer;
+let modalReturnFocus=null;
 const roleRoutes={student:'/',leader:'/organizer',advisor:'/advisor',partner:'/partner',admin:'/admin'};
 const navStudent=[['/','home','Home'],['/discover','compass','Discover'],['/calendar','calendar','Calendar'],['/service','heart','Service hours'],['/notifications','bell','Updates']];
 const staffNav={
@@ -16,6 +17,20 @@ const staffNav={
   admin:[['/admin','chart','Overview'],['/advisor','shield','Service review'],['/organizer','calendar','Club management']]
 };
 const schoolMark=`<span class="brand-mark">${icon('school',22)}</span>`;
+
+function focusSelector(element){
+  if(!element||!app.contains(element))return null;
+  if(element.id)return `#${CSS.escape(element.id)}`;
+  const attributes=[...element.attributes].filter(a=>a.name.startsWith('data-'));
+  if(attributes.length)return element.tagName.toLowerCase()+attributes.map(a=>`[${a.name}="${CSS.escape(a.value)}"]`).join('');
+  if(element.matches('a[href]'))return `a[href="${CSS.escape(element.getAttribute('href'))}"]`;
+  if(element.matches('input[name]'))return `input[name="${CSS.escape(element.name)}"]`;
+  return null;
+}
+function restoreFocus(selector){
+  const target=selector&&[...app.querySelectorAll(selector)].find(el=>el.getClientRects().length&&!el.disabled);
+  (target||document.querySelector('#main'))?.focus({preventScroll:true});
+}
 
 export function toast(message,type='success'){
   if(present&&type!=='error')return;
@@ -27,6 +42,7 @@ export function toast(message,type='success'){
 }
 export function closeModal(){if(dialog.open)dialog.close();}
 export function modal(title,html,onSubmit){
+  if(!dialog.open)modalReturnFocus=focusSelector(document.activeElement);
   document.querySelector('#modal-title').textContent=title;
   document.querySelector('#modal-body').innerHTML=html;
   dialog.querySelectorAll('[data-dismiss]').forEach(b=>b.onclick=closeModal);
@@ -36,6 +52,10 @@ export function modal(title,html,onSubmit){
   if(!dialog.open)dialog.showModal();
 }
 document.querySelector('#modal-close').onclick=closeModal;
+dialog.addEventListener('close',()=>{
+  if(modalReturnFocus)restoreFocus(modalReturnFocus);
+  modalReturnFocus=null;
+});
 document.querySelector('.skip-link').addEventListener('click',e=>{
   e.preventDefault();document.querySelector('#main')?.focus();
 });
@@ -45,7 +65,7 @@ dialog.addEventListener('click',e=>{
     if(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom)closeModal();
   }
 });
-window.addEventListener('hashchange',()=>{closeModal();render();window.scrollTo({top:0,behavior:'instant'});});
+window.addEventListener('hashchange',()=>{closeModal();render();document.querySelector('#main')?.focus({preventScroll:true});window.scrollTo({top:0,behavior:'instant'});});
 function route(){return location.hash.slice(1).split('?')[0]||'/';}
 function activeNav(r,path){
   if(path==='/')return r==='/';
@@ -83,6 +103,7 @@ function renderAccount(){
   document.querySelector('#reset-demo').onclick=resetDialog;
 }
 export function render(){
+  const focused=focusSelector(document.activeElement);
   const s=store.get();
   const p=s.personas.find(x=>x.id===s.activePersonaId)||s.personas[0];
   if(route()==='/'&&p.role!=='student'){
@@ -118,6 +139,7 @@ export function render(){
     e.preventDefault();setSearch(String(new FormData(e.target).get('query')||''));
     location.hash='#/discover';render();
   });
+  if(focused&&!dialog.open)restoreFocus(focused);
 }
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&present&&!dialog.open)setPresentation(false);});
 store.subscribe(()=>render());
