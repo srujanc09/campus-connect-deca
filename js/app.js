@@ -8,31 +8,116 @@ const dialog=document.querySelector('#modal');
 let present=new URLSearchParams(location.search).get('present')==='1';
 let toastTimer;
 const roleRoutes={student:'/',leader:'/organizer',advisor:'/advisor',partner:'/partner',admin:'/admin'};
-const navStudent=[['/','home','Overview'],['/discover','compass','Discover'],['/calendar','calendar','Calendar'],['/service','heart','My impact'],['/notifications','bell','Updates']];
-const staffNav={leader:[['/organizer','calendar','Club workspace']],advisor:[['/advisor','shield','Service review'],['/organizer','calendar','Club workspace']],partner:[['/partner','briefcase','Partner workspace']],admin:[['/admin','chart','School overview'],['/advisor','shield','Service review'],['/organizer','calendar','Club workspace']]};
-export function toast(message,type='success'){const el=document.querySelector('#toast');el.className=`visible ${type}`;el.innerHTML=`${icon(type==='error'?'info':'check',18)}<span>${escape(message)}</span>`;clearTimeout(toastTimer);toastTimer=setTimeout(()=>el.classList.remove('visible'),4500);}
-export function closeModal(){dialog.close();}
-export function modal(title,html,onSubmit){document.querySelector('#modal-title').textContent=title;document.querySelector('#modal-body').innerHTML=html;dialog.querySelectorAll('[data-dismiss]').forEach(b=>b.onclick=closeModal);if(onSubmit)dialog.querySelector('form')?.addEventListener('submit',e=>{e.preventDefault();onSubmit(new FormData(e.target),e.target);});if(!dialog.open)dialog.showModal();}
-document.querySelector('#modal-close').onclick=closeModal;
-document.querySelector('.skip-link').addEventListener('click',e=>{e.preventDefault();document.querySelector('#main')?.focus();});
-dialog.addEventListener('click',e=>{if(e.target===dialog){const r=dialog.getBoundingClientRect();if(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom)closeModal();}});
-window.addEventListener('hashchange',()=>{closeModal();render();window.scrollTo({top:0,behavior:'instant'});});
-const schoolMark=`<span class="brand-mark">${icon('school',25)}</span>`;
-function route(){return location.hash.slice(1).split('?')[0]||'/';}
-function activeNav(r,path){if(path==='/')return r==='/';if(path==='/discover')return ['/discover','/club/','/opportunity/'].some(x=>r.startsWith(x));if(path==='/calendar')return r==='/calendar'||r.startsWith('/event/');return r.startsWith(path);}
-function renderWelcome(){modal('One campus. Different perspectives.',`<div class="welcome-intro">${schoolMark}<p>Explore Campus Connect through the people who make a school community work.</p></div><div class="persona-options">${store.get().personas.map(p=>`<button class="persona-option" data-welcome-persona="${p.id}"><span class="avatar">${escape(p.initials)}</span><span><strong>${escape(p.name)}</strong><small>${escape(p.title)}</small></span>${icon('arrow',18)}</button>`).join('')}</div><p class="small-note left-note">Concept demo with fictional people and activities. Each browser keeps its own copy of the demo.</p>`);dialog.querySelectorAll('[data-welcome-persona]').forEach(b=>b.onclick=()=>{const p=store.get().personas.find(x=>x.id===b.dataset.welcomePersona);store.setPersona(p.id);location.hash='#'+roleRoutes[p.role];closeModal();render();});}
-export function render(){const s=store.get();const p=s.personas.find(x=>x.id===s.activePersonaId)||s.personas[0];const r=route();const isStaff=['/organizer','/advisor','/partner','/admin'].includes(r);const nav=p.role==='student'?navStudent:staffNav[p.role]||navStudent;const unread=s.notifications.filter(n=>n.studentId===p.studentId&&!n.read).length;const roleLabel={student:'Student space',leader:'Club leadership',advisor:'Advisor space',partner:'Community partners',admin:'School administration'}[p.role];const navHtml=nav.map(([path,name,label])=>`<a class="nav-item ${activeNav(r,path)?'active':''}" href="#${path}" ${activeNav(r,path)?'aria-current="page"':''}>${icon(name,20)}<span>${label}</span>${path==='/notifications'&&unread?`<span class="nav-badge">${unread}</span>`:''}</a>`).join('');
-document.body.classList.toggle('presentation-mode',present);
-app.innerHTML=`<aside class="sidebar"><a class="brand" href="#${roleRoutes[p.role]}">${schoolMark}<span>Campus<br><b>Connect<span class="brand-dot">.</span></b></span></a><div class="school-switch">${icon('school',18)}<div><strong>Lightridge</strong><span>High school community</span></div></div><div class="nav-label">${escape(roleLabel)}</div><nav class="desktop-nav" aria-label="Main navigation">${navHtml}</nav><div class="sidebar-spacer"></div><div class="sidebar-note"><span>YOU BELONG HERE.</span><p>A little connection<br>goes a long way.</p><div class="note-motif">✳ <span>✦</span> ✳</div></div><button class="sidebar-persona" id="welcome-personas"><span class="avatar">${escape(p.initials)}</span><span><strong>${escape(p.name)}</strong><small>${escape(p.title)}</small></span>${icon('settings',16)}</button><div class="sidebar-foot">Made for your next chapter.</div></aside><div class="workspace"><header class="topbar"><a class="mobile-brand" href="#${roleRoutes[p.role]}">${schoolMark}<strong>Campus Connect<span>.</span></strong></a><div class="breadcrumb">${icon('school',16)} <span>Lightridge</span><span>/</span><strong>${escape(roleLabel)}</strong></div><form class="search-box global-search" id="global-search">${icon('search',17)}<input name="query" placeholder="Find your next good thing…" aria-label="Search campus"><span>↵</span></form><div class="topbar-actions"><span class="demo-indicator"><i></i> Concept demo <span>· Sample data</span></span>${p.role==='student'?`<a class="notification-button icon-btn" href="#/notifications" aria-label="Notifications, ${unread} unread">${icon('bell',21)}${unread?'<i></i>':''}</a>`:''}<button class="avatar top-avatar" id="top-personas" aria-label="Switch demo perspective">${escape(p.initials)}</button></div></header>${!store.storageAvailable?'<div class="storage-warning">Changes are saved only for this session because browser storage is unavailable.</div>':''}<main id="main" tabindex="-1">${isStaff?renderStaff(r,s,p):renderStudent(r,s,p)}</main><footer class="app-footer"><span>Campus Connect <b>✦</b> Your campus, connected.</span><span>Concept demo · Fictional sample data</span></footer></div><nav class="mobile-nav" aria-label="Mobile navigation">${navHtml}</nav>${!present?`<div class="demo-toolbar"><span>${icon('spark',15)} Explore the demo</span><label class="sr-only" for="persona-select">Demo perspective</label><select id="persona-select">${s.personas.map(persona=>`<option value="${persona.id}" ${persona.id===p.id?'selected':''}>${escape(persona.title)} · ${escape(persona.name.split(' ')[0])}</option>`).join('')}</select><button id="presentation-toggle" title="Hide demo controls for screenshots">Presentation view ${icon('arrow',13)}</button><button id="reset-demo" aria-label="Reset demo data" title="Reset demo data">${icon('reset',16)}</button></div>`:''}`;
-document.title=`${r==='/admin'?'School overview':r==='/service'?'My impact':r==='/calendar'?'Calendar':r==='/discover'?'Discover':'Your campus'} · Campus Connect`;
-const api={store,toast,modal,closeModal,render,icon,escape,formatDate,formatTime};
-if(isStaff)bindStaff(document.querySelector('#main'),api);else bindStudent(document.querySelector('#main'),api);
-document.querySelector('#welcome-personas')?.addEventListener('click',renderWelcome);document.querySelector('#top-personas')?.addEventListener('click',renderWelcome);
-document.querySelector('#persona-select')?.addEventListener('change',e=>{const selected=store.get().personas.find(x=>x.id===e.target.value);store.setPersona(selected.id);location.hash='#'+roleRoutes[selected.role];render();window.scrollTo(0,0);});
-document.querySelector('#global-search')?.addEventListener('submit',e=>{e.preventDefault();const q=new FormData(e.target).get('query');if(p.role!=='student')store.setPersona('student-maya');setSearch(q);location.hash='#/discover';render();});
-document.querySelector('#presentation-toggle')?.addEventListener('click',()=>{present=true;const url=new URL(location);url.searchParams.set('present','1');history.replaceState({},'',url);render();toast('Presentation view. Press Escape to restore demo controls.');});
-document.querySelector('#reset-demo')?.addEventListener('click',()=>{modal('A fresh start for your demo',`<p class="body-copy">Restore the original sample data? Your demo changes in this browser will be replaced.</p><div class="modal-actions"><button class="btn secondary" data-dismiss>Keep exploring</button><button class="btn primary" id="confirm-reset">Reset demo</button></div>`);document.querySelector('#confirm-reset').onclick=()=>{store.reset();location.hash='#/';closeModal();render();toast('Your campus is ready for a fresh start.');};});
+const navStudent=[['/','home','Home'],['/discover','compass','Discover'],['/calendar','calendar','Calendar'],['/service','heart','Service hours'],['/notifications','bell','Updates']];
+const staffNav={
+  leader:[['/organizer','calendar','Club management']],
+  advisor:[['/advisor','shield','Service review'],['/organizer','calendar','Club management']],
+  partner:[['/partner','briefcase','Opportunities']],
+  admin:[['/admin','chart','Overview'],['/advisor','shield','Service review'],['/organizer','calendar','Club management']]
+};
+const schoolMark=`<span class="brand-mark">${icon('school',22)}</span>`;
+
+export function toast(message,type='success'){
+  const el=document.querySelector('#toast');
+  el.className=`visible ${type}`;
+  el.innerHTML=`${icon(type==='error'?'info':'check',18)}<span>${escape(message)}</span>`;
+  clearTimeout(toastTimer);
+  toastTimer=setTimeout(()=>el.classList.remove('visible'),4500);
 }
-document.addEventListener('keydown',e=>{if(e.key==='Escape'&&present&&!dialog.open){present=false;const url=new URL(location);url.searchParams.delete('present');history.replaceState({},'',url);render();}});
+export function closeModal(){if(dialog.open)dialog.close();}
+export function modal(title,html,onSubmit){
+  document.querySelector('#modal-title').textContent=title;
+  document.querySelector('#modal-body').innerHTML=html;
+  dialog.querySelectorAll('[data-dismiss]').forEach(b=>b.onclick=closeModal);
+  if(onSubmit)dialog.querySelector('form')?.addEventListener('submit',e=>{
+    e.preventDefault();onSubmit(new FormData(e.target),e.target);
+  });
+  if(!dialog.open)dialog.showModal();
+}
+document.querySelector('#modal-close').onclick=closeModal;
+document.querySelector('.skip-link').addEventListener('click',e=>{
+  e.preventDefault();document.querySelector('#main')?.focus();
+});
+dialog.addEventListener('click',e=>{
+  if(e.target===dialog){
+    const r=dialog.getBoundingClientRect();
+    if(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom)closeModal();
+  }
+});
+window.addEventListener('hashchange',()=>{closeModal();render();window.scrollTo({top:0,behavior:'instant'});});
+function route(){return location.hash.slice(1).split('?')[0]||'/';}
+function activeNav(r,path){
+  if(path==='/')return r==='/';
+  if(path==='/discover')return ['/discover','/club/','/opportunity/'].some(x=>r.startsWith(x));
+  if(path==='/calendar')return r==='/calendar'||r.startsWith('/event/');
+  return r.startsWith(path);
+}
+function pageTitle(r,s){
+  const names={'/':'Home','/discover':'Discover','/calendar':'Calendar','/service':'Service hours','/notifications':'Updates','/organizer':'Club management','/advisor':'Service review','/partner':'Opportunities','/admin':'Overview'};
+  if(names[r])return names[r];
+  const id=r.split('/')[2];
+  return (r.startsWith('/club/')?s.clubs.find(c=>c.id===id)?.name:r.startsWith('/event/')?s.events.find(e=>e.id===id)?.title:r.startsWith('/opportunity/')?s.listings.find(l=>l.id===id)?.title:null)||'Campus Connect';
+}
+function setPresentation(value){
+  present=value;
+  const url=new URL(location);
+  if(present)url.searchParams.set('present','1');else url.searchParams.delete('present');
+  history.replaceState({},'',url);
+  render();
+}
+function resetDialog(){
+  modal('Reset demo?',`<p class="body-copy">Restore the sample data? This replaces changes saved in this browser.</p><div class="modal-actions"><button class="btn secondary" data-dismiss>Cancel</button><button class="btn primary" id="confirm-reset">Reset demo</button></div>`);
+  document.querySelector('#confirm-reset').onclick=()=>{
+    store.reset();location.hash='#/';closeModal();render();toast('Demo reset.');
+  };
+}
+function renderAccount(){
+  const s=store.get();
+  modal('Account',`<p class="account-section-label">Demo accounts</p><div class="persona-options">${s.personas.map(p=>`<button class="persona-option ${p.id===s.activePersonaId?'selected':''}" data-welcome-persona="${p.id}" aria-pressed="${p.id===s.activePersonaId}"><span class="avatar">${escape(p.initials)}</span><span><strong>${escape(p.name)}</strong><small>${escape(p.title)}</small></span>${icon(p.id===s.activePersonaId?'check':'chevron',18)}</button>`).join('')}</div><div class="account-settings"><button id="presentation-toggle" class="account-setting">${icon('settings',18)}<span>Presentation mode</span><span class="setting-value">${present?'On':'Off'}</span></button><button id="reset-demo" class="account-setting">${icon('reset',18)}<span>Reset demo data</span>${icon('chevron',16)}</button></div><p class="account-note">Sample accounts and activity. Changes stay in this browser.</p>`);
+  dialog.querySelectorAll('[data-welcome-persona]').forEach(b=>b.onclick=()=>{
+    const p=store.get().personas.find(x=>x.id===b.dataset.welcomePersona);
+    store.setPersona(p.id);location.hash='#'+roleRoutes[p.role];closeModal();render();
+  });
+  document.querySelector('#presentation-toggle').onclick=()=>{setPresentation(!present);renderAccount();};
+  document.querySelector('#reset-demo').onclick=resetDialog;
+}
+export function render(){
+  const s=store.get();
+  const p=s.personas.find(x=>x.id===s.activePersonaId)||s.personas[0];
+  if(route()==='/'&&p.role!=='student'){
+    const url=new URL(location);url.hash=roleRoutes[p.role];history.replaceState({},'',url);
+  }
+  const r=route();
+  const isStaff=['/organizer','/advisor','/partner','/admin'].includes(r);
+  const nav=p.role==='student'?navStudent:staffNav[p.role]||navStudent;
+  const unread=s.notifications.filter(n=>n.studentId===p.studentId&&!n.read).length;
+  const navHtml=nav.map(([path,name,label])=>`<a class="nav-item ${activeNav(r,path)?'active':''}" href="#${path}" ${activeNav(r,path)?'aria-current="page"':''}>${icon(name,20)}<span>${label}</span>${path==='/notifications'&&unread?`<span class="nav-badge">${unread}</span>`:''}</a>`).join('');
+  document.body.classList.toggle('presentation-mode',present);
+  app.innerHTML=`<aside class="sidebar">
+    <a class="brand" href="#${roleRoutes[p.role]}">${schoolMark}<span>Campus Connect</span></a>
+    <div class="school-switch"><span class="school-initials">LH</span><div><strong>Lightridge</strong><span>High School</span></div></div>
+    <nav class="desktop-nav" aria-label="Main navigation">${navHtml}</nav>
+    <div class="sidebar-spacer"></div>
+    <button class="sidebar-persona" id="welcome-personas" aria-label="Account and demo settings"><span class="avatar">${escape(p.initials)}</span><span><strong>${escape(p.name)}</strong><small>${escape(p.title)}</small></span>${icon('settings',18)}</button>
+  </aside>
+  <div class="workspace"><header class="topbar">
+    <a class="mobile-brand" href="#${roleRoutes[p.role]}">${schoolMark}<strong>Campus Connect</strong></a>
+    <div class="breadcrumb"><span>Lightridge High School</span></div>
+    ${p.role==='student'?`<form class="search-box global-search" id="global-search">${icon('search',18)}<input name="query" placeholder="Search clubs" aria-label="Search clubs" autocomplete="off"><button type="submit" class="search-submit" aria-label="Submit club search">${icon('arrow',16)}</button></form>`:''}
+    <div class="topbar-actions"><span class="demo-indicator" title="Fictional sample data">Demo</span>${p.role==='student'?`<a class="notification-button icon-btn" href="#/notifications" aria-label="Notifications, ${unread} unread">${icon('bell',21)}${unread?'<i></i>':''}</a>`:''}<button class="avatar top-avatar" id="top-personas" aria-label="Account and demo settings">${escape(p.initials)}</button></div>
+  </header>${!store.storageAvailable?'<div class="storage-warning">Changes will be saved for this session only.</div>':''}
+  <main id="main" tabindex="-1">${isStaff?renderStaff(r,s,p):renderStudent(r,s,p)}</main></div>
+  <nav class="mobile-nav" aria-label="Mobile navigation">${navHtml}</nav>`;
+  document.title=`${pageTitle(r,s)} · Campus Connect`;
+  const api={store,toast,modal,closeModal,render,icon,escape,formatDate,formatTime};
+  if(isStaff)bindStaff(document.querySelector('#main'),api);else bindStudent(document.querySelector('#main'),api);
+  document.querySelector('#welcome-personas')?.addEventListener('click',renderAccount);
+  document.querySelector('#top-personas')?.addEventListener('click',renderAccount);
+  document.querySelector('#global-search')?.addEventListener('submit',e=>{
+    e.preventDefault();setSearch(String(new FormData(e.target).get('query')||''));
+    location.hash='#/discover';render();
+  });
+}
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&present&&!dialog.open)setPresentation(false);});
 store.subscribe(()=>render());
 render();

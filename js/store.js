@@ -361,10 +361,83 @@ function validState(candidate) {
   return candidate && candidate.schemaVersion === VERSION && arrays.every(key => Array.isArray(candidate[key])) && candidate.goals && candidate.school && candidate.personas.some(p => p.id === candidate.activePersonaId);
 }
 
+
+// Exact original-copy matches only: never replace presenter edits or activity data.
+const SEED_COPY_UPDATES = [
+  ["clubs", "c1", "description", "Practice your pitch, build business skills, and prepare for competition with a team that backs you.", "Business competitions, role-play practice, and presentation workshops."],
+  ["clubs", "c2", "description", "Design, code, and build robots with students who love solving problems together.", "Robot design, programming, and team builds."],
+  ["clubs", "c3", "description", "Make our school and neighborhood greener through practical community projects.", "Campus gardening, cleanups, and conservation projects."],
+  ["clubs", "c4", "description", "Try new mediums, share your work, and help create art around campus.", "Art workshops, student exhibitions, and campus projects."],
+  ["clubs", "c5", "description", "Find meaningful ways to volunteer and serve the local community.", "Community volunteering and service projects."],
+  ["clubs", "c6", "description", "Explore global issues, debate ideas, and represent countries at conferences.", "Debate practice and Model UN conferences."],
+  ["clubs", "c7", "description", "Capture school life and learn the craft behind a great photograph.", "Photography practice, photo walks, and school coverage."],
+  ["clubs", "c8", "description", "Celebrate scholarship, service, leadership, and character through shared action.", "Scholarship, leadership, and community service."],
+  ["clubs", "c9", "description", "Build useful projects, learn new tools, and turn your ideas into something real.", "Programming workshops and student software projects."],
+  ["clubs", "c10", "description", "Help plan school traditions and bring student ideas to life.", "Student representation and school event planning."],
+  ["clubs", "c11", "description", "Find your pace with friendly group runs and encouragement for every level.", "Group runs for all experience levels."],
+  ["clubs", "c12", "description", "Publish student writing, illustration, and stories that deserve to be heard.", "Student writing, illustration, and magazine publishing."],
+  ["partners", "p1", "description", "A fictional local pantry connecting neighbors with food and essential supplies.", "Food and essential supplies for local families."],
+  ["partners", "p2", "description", "A fictional community library with reading programs and student volunteer projects.", "Reading programs and student volunteer projects."],
+  ["partners", "p3", "description", "A fictional design studio helping students explore creative careers.", "Design services and student career programs."],
+  ["partners", "p4", "description", "A fictional neighborhood shop supporting active student life.", "Outdoor gear and sporting goods."],
+  ["partners", "p5", "description", "A fictional cafe offering student-friendly opportunities.", "Local cafe with student employment opportunities."],
+  ["partners", "p6", "description", "A fictional volunteer group caring for trails and local green spaces.", "Volunteer trail maintenance and conservation."],
+  ["events", "e1", "description", "Bring your ideas. We will practice role-plays, review judging criteria, and polish our presentation skills.", "Practice role-plays, review judging criteria, and work on presentations."],
+  ["events", "e2", "title", "Pack a little kindness", "Food pantry packing"],
+  ["events", "e2", "description", "Help Willow Community Pantry sort donations and pack grocery kits for local families. Comfortable shoes recommended.", "Sort donations and pack grocery kits for local families. Wear comfortable shoes."],
+  ["events", "e3", "description", "Join the team to test this season’s robot and work through the latest design challenge.", "Test the team robot and work on the current design challenge."],
+  ["events", "e4", "title", "Creative studio afternoon", "Printmaking workshop"],
+  ["events", "e4", "description", "A small-group printmaking workshop with Art Collective. All materials are included.", "Printmaking with Art Collective. All materials included."],
+  ["events", "e7", "title", "Trail care morning", "Trail cleanup"],
+  ["events", "e7", "description", "Help the conservation team clear litter and restore a local walking trail.", "Clear litter and restore a local walking trail with the conservation team."],
+  ["events", "e9", "description", "Meet student leaders and explore the clubs that make our school community special.", "Meet club leaders and browse school clubs."],
+  ["events", "e10", "title", "Build your first website", "Website workshop"],
+  ["events", "e14", "title", "Poetry & open pages", "Poetry reading"],
+  ["events", "e14", "description", "Bring a piece of writing to share, or listen and find inspiration.", "Read your writing or listen to student work."],
+  ["events", "e16", "title", "Campus garden refresh", "Campus gardening"],
+  ["events", "e16", "description", "Plant seasonal seedlings and tidy the courtyard garden together.", "Plant seasonal seedlings and tidy the courtyard garden."],
+  ["events", "e19", "description", "Join classmates to make our shared outdoor spaces more welcoming.", "Clean up litter in Community Park."],
+  ["events", "e21", "description", "A friendly afternoon run supporting a welcoming school community.", "An afternoon group run for students."],
+  ["listings", "l1", "title", "Pack a little kindness", "Food pantry packing"],
+  ["listings", "l1", "description", "Give three hours of your Saturday to help pack grocery kits for local families. No experience needed; the pantry team will show you everything.", "Pack grocery kits for local families during a three-hour shift. No experience needed; training provided."],
+  ["listings", "l2", "description", "Sort and prepare donated winter coats for neighbors. A welcoming weekend volunteer opportunity.", "Sort donated winter coats for distribution."],
+  ["listings", "l3", "title", "A first look at design", "Design internship"],
+  ["listings", "l3", "description", "Explore creative careers through a four-week after-school design internship. This is a fictional opportunity for the concept demo.", "Four-week after-school internship in design and creative careers."],
+  ["listings", "l4", "title", "Your next adventure, for less", "Student gear discount"],
+  ["listings", "l4", "description", "A sample student discount on outdoor essentials. Show your student ID in this fictional offer.", "Get 15% off outdoor essentials with a student ID."],
+  ["listings", "l5", "description", "A sample part-time opportunity to help with shelving, programs, and a welcoming library space.", "Part-time work shelving books and assisting with library programs."],
+  ["listings", "l6", "title", "Support for student ideas", "Club project sponsorship"],
+  ["listings", "l6", "description", "A fictional sponsorship program providing design support and materials for approved student club projects.", "Design support and materials for approved club projects."],
+  ["listings", "l7", "description", "A sample weekend position for students interested in hospitality. Awaiting partner and school review.", "Weekend cafe shifts. Awaiting partner and school review."],
+  ["listings", "l8", "description", "A draft program helping students plan community trail projects and share conservation skills.", "Plan community trail projects and learn conservation skills. Draft program."],
+  ["announcements", "an1", "title", "Your next opportunity is closer than you think", "Fall club showcase"],
+  ["announcements", "an1", "body", "The fall club showcase is this Friday. Bring a friend, meet club leaders, and find a new interest.", "Meet club leaders Friday, 3:30–5:30 PM in the main commons."],
+  ["announcements", "an2", "title", "Competition season starts here", "DECA workshop"],
+  ["announcements", "an2", "body", "Join our Tuesday workshop for role-play practice and helpful feedback. All experience levels are welcome.", "Role-play practice Tuesday, 3:30–5:00 PM in Room 214. All experience levels welcome."],
+  ["announcements", "an3", "title", "A small Saturday can make a big difference", "Pantry volunteers needed"],
+  ["announcements", "an3", "body", "Willow Community Pantry has volunteer spaces available this weekend. Find the opportunity and reserve your place.", "Volunteer Saturday, 9:00 AM–noon at Willow Community Pantry. Sign up in Opportunities."],
+  ["notifications", "n1", "title", "Your pantry hours are approved", "Service hours approved"],
+  ["notifications", "n1", "body", "3 service hours from Neighborhood food drive have been added to your total.", "3 hours approved for Neighborhood food drive."],
+  ["notifications", "n2", "title", "Your library hours are in review", "Service hours in review"],
+  ["notifications", "n2", "body", "Your advisor will review your 2-hour service submission.", "2 hours from Library reading buddies are awaiting advisor review."],
+  ["notifications", "n3", "title", "You have a place at the pantry", "Pantry sign-up confirmed"],
+  ["notifications", "n3", "body", "Pack a little kindness is on Saturday, November 21 at 9:00 AM.", "Food pantry packing · Saturday, November 21 at 9:00 AM."]
+];
+
+function migrateSeedCopy(state) {
+  let changed = false;
+  for (const [collection, id, field, original, replacement] of SEED_COPY_UPDATES) {
+    const row = state[collection].find(item => item?.id === id);
+    if (row && row[field] === original) { row[field] = replacement; changed = true; }
+  }
+  return changed;
+}
+
 export function createStore(options = {}) {
   let storage = options.storage;
   let storageAvailable = false;
   let state = copy(options.initialState || createSeed());
+  let migrated = false;
   const listeners = new Set();
   if (!Object.prototype.hasOwnProperty.call(options, 'storage')) {
     try { storage = globalThis.localStorage; } catch { storage = null; }
@@ -378,7 +451,10 @@ export function createStore(options = {}) {
         const raw = storage.getItem(STORAGE_KEY);
         try {
           const saved = JSON.parse(raw || 'null');
-          if (saved?.version === VERSION && validState(saved.state)) state = saved.state;
+          if (saved?.version === VERSION && validState(saved.state)) {
+            state = saved.state;
+            migrated = migrateSeedCopy(state);
+          }
         } catch { /* Malformed saved demo data recovers to the seed; storage still works. */ }
       }
     } catch { storageAvailable = false; }
@@ -392,6 +468,7 @@ export function createStore(options = {}) {
       try { listener(state); } catch (error) { console.error('Campus Connect view could not update:', error); }
     }
   };
+  if (migrated) persist();
   return {
     get: () => state,
     get storageAvailable() { return storageAvailable; },
