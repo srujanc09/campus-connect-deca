@@ -1,7 +1,9 @@
 import { escape, icon, formatDate, formatTime } from './ui.js';
 import { DEMO_NOW } from './seed.js';
 
-const local = { organizerTab: 'events', serviceTab: 'pending', adminTab: 'overview', selectedEventId: null };
+const initialView = () => ({ organizerTab: 'events', serviceTab: 'pending', adminTab: 'overview', selectedEventId: null, selectedLogId: null, organizerPage: 1, servicePage: 1, rosterPage: 1 });
+const local = initialView();
+export function resetStaffView() { Object.assign(local, initialView()); }
 let boundController;
 const E = value => escape(String(value ?? ''));
 const A = value => Array.isArray(value) ? value : [];
@@ -26,6 +28,18 @@ const tabs = (items, selected, group) => `<div class="tabs" role="group" aria-la
 const header = (eyebrow, title, subtitle, action = '') => `<div class="page-heading staff-page-heading"><div>${eyebrow ? `<div class="eyebrow">${E(eyebrow)}</div>` : ''}<h1>${E(title)}</h1>${subtitle ? `<p>${E(subtitle)}</p>` : ''}</div>${action ? `<div class="staff-heading-actions">${action}</div>` : ''}</div>`;
 const dateBlock = value => { const d = new Date(value); return Number.isNaN(+d) ? '<div class="staff-date"><span>DATE</span><strong>—</strong></div>' : `<div class="staff-date"><span>${E(d.toLocaleDateString('en-US', { month: 'short', timeZone: 'America/New_York' }))}</span><strong>${d.toLocaleDateString('en-US', { day: 'numeric', timeZone: 'America/New_York' })}</strong></div>`; };
 
+function pageOf(records, requested, size) {
+  const pages = Math.max(1, Math.ceil(records.length / size));
+  const page = Math.max(1, Math.min(pages, Number(requested) || 1));
+  const start = (page - 1) * size;
+  return { page, pages, start, end: Math.min(start + size, records.length), items: records.slice(start, start + size) };
+}
+function pager(total, page, size, group, label) {
+  const pages = Math.max(1, Math.ceil(total / size));
+  if (total <= size) return '';
+  return `<nav class="staff-pagination" aria-label="${E(label)} pages"><span>${(page - 1) * size + 1}–${Math.min(page * size, total)} of ${total}</span><div><button type="button" class="icon-btn" data-staff-action="page" data-group="${group}" data-value="${page - 1}" aria-label="Previous ${E(label)} page" ${page <= 1 ? 'disabled' : ''}>${icon('left',17)}</button><span class="staff-page-number">${page} / ${pages}</span><button type="button" class="icon-btn" data-staff-action="page" data-group="${group}" data-value="${page + 1}" aria-label="Next ${E(label)} page" ${page >= pages ? 'disabled' : ''}>${icon('chevron',17)}</button></div></nav>`;
+}
+
 function organizer(state, persona) {
   const events = ownEvents(state, persona).sort((a, b) => Number(finished(a)) - Number(finished(b)) || String(a.start).localeCompare(String(b.start)));
   const eventIds = new Set(events.map(x => x.id));
@@ -36,23 +50,31 @@ function organizer(state, persona) {
   if (local.organizerTab === 'announcements') content = announcements(state, persona);
   else if (local.organizerTab === 'members') content = membershipQueue(state, persona);
   else {
-    const selected = events.find(x => x.id === local.selectedEventId) || events.find(x => x.status === 'published') || events[0];
-    content = `<div class="staff-layout"><section><div class="staff-section-head"><div><h2>Events</h2></div><span class="badge green">${events.length} events</span></div><div class="staff-event-list">${events.length ? events.map(event => {
+    const chosenIndex = events.findIndex(x => x.id === local.selectedEventId);
+    if (chosenIndex >= 0) local.organizerPage = Math.floor(chosenIndex / 5) + 1;
+    const page = pageOf(events, local.organizerPage, 5);
+    local.organizerPage = page.page;
+    const selected = page.items.find(x => x.id === local.selectedEventId) || page.items.find(x => x.status === 'published') || page.items[0];
+    if (local.selectedEventId !== selected?.id) local.rosterPage = 1;
+    local.selectedEventId = selected?.id || null;
+    content = `<div class="staff-layout staff-events-layout"><section class="card staff-event-panel"><div class="staff-section-head staff-panel-heading"><h2>Events</h2><span class="staff-record-count">${events.length} total</span></div><div class="staff-event-list">${events.length ? page.items.map(event => {
       const count = rsvps.filter(x => x.eventId === event.id).length;
-      return `<article class="staff-event ${event.id === selected?.id ? 'selected' : ''}">${dateBlock(event.start)}<div><h3>${E(event.title)}</h3><p>${E(event.host || clubFor(state, event.clubId).name)}<br>${E(timeText(event.start))} · ${E(event.location || 'Location to be confirmed')}</p></div><div class="staff-event-end">${badge(finished(event) && event.status === 'published' ? 'completed' : event.status)}<div class="staff-event-actions">${btn(`${count} RSVP${count === 1 ? '' : 's'}`, 'roster', { id: event.id }, 'ghost small')}${!finished(event) && event.status !== 'cancelled' ? btn('Edit', 'edit-event', { id: event.id }) : ''}${event.status === 'draft' ? btn('Publish', 'publish-event', { id: event.id }, 'primary small') : event.status === 'published' && !finished(event) ? btn('Cancel', 'cancel-event', { id: event.id }, 'ghost small staff-danger') : ''}</div></div></article>`;
-    }).join('') : empty('No events yet', 'Create an event to start accepting RSVPs.', 'calendar')}</div></section><aside class="card staff-card-pad">${selected ? roster(state, selected) : empty('No event selected', 'Create an event to manage attendance.', 'users')}</aside></div>`;
+      return `<article class="staff-event ${event.id === selected?.id ? 'selected' : ''}" data-event-row="${E(event.id)}">${dateBlock(event.start)}<div class="staff-event-main"><button type="button" class="staff-record-title" data-staff-action="roster" data-id="${E(event.id)}" aria-pressed="${event.id === selected?.id}">${E(event.title)}</button><p>${E(timeText(event.start))} · ${E(event.location || 'Location to be confirmed')}</p><div class="staff-event-actions">${btn(`${count} RSVP${count === 1 ? '' : 's'}`, 'roster', { id: event.id }, 'ghost small')}${!finished(event) && event.status !== 'cancelled' ? btn('Edit', 'edit-event', { id: event.id }) : ''}${event.status === 'draft' ? btn('Publish', 'publish-event', { id: event.id }, 'primary small') : event.status === 'published' && !finished(event) ? btn('Cancel', 'cancel-event', { id: event.id }, 'ghost small staff-danger') : ''}</div></div><div class="staff-event-state">${badge(finished(event) && event.status === 'published' ? 'completed' : event.status)}</div></article>`;
+    }).join('') : empty('No events yet', 'Create an event to start accepting RSVPs.', 'calendar')}</div>${pager(events.length, page.page, 5, 'organizerPage', 'events')}</section><aside class="card staff-card-pad staff-attendance-panel" aria-label="Selected event attendance">${selected ? roster(state, selected) : empty('No event selected', 'Create an event to manage attendance.', 'users')}</aside></div>`;
   }
-  return `${header('', 'Manage clubs', '', btn(`${icon('plus')} Create event`, 'new-event', {}, 'primary'))}<div class="staff-kpis">${kpi('Published events', events.filter(x => x.status === 'published').length, 'Across your managed clubs', 'calendar')}${kpi('Event RSVPs', rsvps.length, 'Current student commitments', 'users')}${kpi('Checked in', attendees.length, 'Recorded event attendance', 'check')}${kpi('Join requests', joinRequests.length, 'Students ready to get involved', 'users')}</div><div class="staff-toolbar">${tabs([['events', 'Events & attendance'], ['announcements', 'Announcements'], ['members', `Join requests${joinRequests.length ? ` <span class="staff-mini-count">${joinRequests.length}</span>` : ''}`]], local.organizerTab, 'organizerTab')}</div>${content}`;
+  return `${header('', 'Manage clubs', '', btn(`${icon('plus')} Create event`, 'new-event', {}, 'primary'))}<div class="staff-kpis">${kpi('Published events', events.filter(x => x.status === 'published').length, '', 'calendar')}${kpi('Event RSVPs', rsvps.length, '', 'users')}${kpi('Checked in', attendees.length, '', 'check')}${kpi('Join requests', joinRequests.length, '', 'users')}</div><div class="staff-toolbar">${tabs([['events', 'Events & attendance'], ['announcements', 'Announcements'], ['members', `Join requests${joinRequests.length ? ` <span class="staff-mini-count">${joinRequests.length}</span>` : ''}`]], local.organizerTab, 'organizerTab')}</div>${content}`;
 }
 
 function roster(state, event) {
   const rsvps = A(state.rsvps).filter(x => x.eventId === event.id);
   const present = A(state.attendance).filter(x => x.eventId === event.id && x.present);
   const capacity = Number(event.capacity || 0);
-  return `<div class="staff-roster-head"><div class="eyebrow">ATTENDANCE</div><h3>${E(event.title)}</h3><p>${E(dateText(event.start))} · ${E(timeText(event.start))}</p><div class="staff-progress-label"><span>${rsvps.length}${capacity ? ` of ${capacity}` : ''} spots reserved</span><span>${present.length} checked in</span></div><div class="progress-track"><div class="progress-fill" style="width:${Math.min(100, capacity ? rsvps.length / capacity * 100 : rsvps.length ? 100 : 0)}%"></div></div></div>${rsvps.length ? rsvps.map(r => {
+  const page = pageOf(rsvps, local.rosterPage, 6);
+  local.rosterPage = page.page;
+  return `<div class="staff-roster-head"><div class="staff-detail-eyebrow">${icon('users',16)} Attendance</div><h3>${E(event.title)}</h3><p>${E(dateText(event.start))} · ${E(timeText(event.start))}</p><div class="staff-progress-label"><span>${rsvps.length}${capacity ? ` of ${capacity}` : ''} spots reserved</span><span>${present.length} checked in</span></div><div class="progress-track"><div class="progress-fill" style="width:${Math.min(100, capacity ? rsvps.length / capacity * 100 : rsvps.length ? 100 : 0)}%"></div></div></div><div class="staff-roster-list">${rsvps.length ? page.items.map(r => {
     const student = studentFor(state, r.studentId); const checked = present.some(x => x.studentId === r.studentId);
-    return `<div class="staff-roster-person"><div class="avatar">${E(initials(student.name))}</div><div><strong>${E(student.name)}</strong><small>${student.grade ? `Grade ${E(student.grade)}` : 'Student member'}</small></div>${finished(event) && event.status === 'published' ? `<button type="button" class="staff-check ${checked ? 'present' : ''}" data-staff-action="attendance" data-event-id="${E(event.id)}" data-student-id="${E(r.studentId)}" data-present="${!checked}" aria-pressed="${checked}">${checked ? '✓ Checked in' : 'Check in'}</button>` : '<span class="badge green">Reserved</span>'}</div>`;
-  }).join('') : empty('No RSVPs yet', 'Students who RSVP will appear here.', 'users')}<div class="staff-note">${icon('info')} ${event.status === 'cancelled' ? 'This event was cancelled.' : event.status === 'draft' ? 'Publish this event to accept RSVPs.' : finished(event) ? 'Record attendance using the check-in buttons.' : 'Check-in opens after the event ends.'}${!finished(event) && event.status === 'published' ? `<div style="margin-top:12px">${btn('Simulate event completion', 'advance-demo', { id: event.id }, 'secondary small')}<p style="margin:8px 0 0">Advances the demo clock. Reset demo to restore Nov 16.</p></div>` : ''}</div>`;
+    return `<div class="staff-roster-person" data-roster-student="${E(r.studentId)}"><div class="avatar">${E(initials(student.name))}</div><div><strong>${E(student.name)}</strong><small>${student.grade ? `Grade ${E(student.grade)}` : 'Student member'}</small></div>${finished(event) && event.status === 'published' ? `<button type="button" class="staff-check ${checked ? 'present' : ''}" data-staff-action="attendance" data-event-id="${E(event.id)}" data-student-id="${E(r.studentId)}" data-present="${!checked}" aria-pressed="${checked}">${checked ? '✓ Checked in' : 'Check in'}</button>` : '<span class="badge">Reserved</span>'}</div>`;
+  }).join('') : empty('No RSVPs yet', 'Students who RSVP will appear here.', 'users')}</div>${pager(rsvps.length, page.page, 6, 'rosterPage', 'attendees')}<div class="staff-note">${event.status === 'cancelled' ? 'This event was cancelled.' : event.status === 'draft' ? 'Publish this event to accept RSVPs.' : finished(event) ? 'Record attendance using the check-in buttons.' : 'Check-in opens after the event ends.'}${!finished(event) && event.status === 'published' ? `<div class="staff-simulation">${btn('Simulate event completion', 'advance-demo', { id: event.id }, 'secondary small')}<p>Advances the demo clock. Reset restores Nov 16.</p></div>` : ''}</div>`;
 }
 
 function announcements(state, persona) {
@@ -67,16 +89,24 @@ function membershipQueue(state, persona) {
   return `<section class="card staff-card-pad"><div class="staff-section-head"><div><h2>Join requests</h2></div></div>${records.length ? records.map(x => { const student = studentFor(state, x.studentId); return `<div class="staff-roster-person"><div class="avatar">${E(initials(student.name))}</div><div><strong>${E(student.name)}</strong><small>${E(clubFor(state, x.clubId).name)}${student.grade ? ` · Grade ${E(student.grade)}` : ''}</small></div><div class="staff-action-row">${btn('Decline', 'membership', { id: x.id, status: 'rejected' }, 'ghost small')}${btn('Approve', 'membership', { id: x.id, status: 'active' }, 'primary small')}</div></div>`; }).join('') : empty('No pending requests', 'New club requests will appear here.', 'users')}</section>`;
 }
 
+function serviceReviewDetail(log, state) {
+  const student = studentFor(state, log.studentId);
+  const event = eventFor(state, log.eventId);
+  return `<article class="staff-review-card staff-selected-review" data-selected-review="${E(log.id)}"><div class="staff-detail-eyebrow">${icon('shield',16)} Service record</div><div class="staff-review-person"><div class="avatar">${E(initials(student.name))}</div><div><strong>${E(student.name)}</strong><span>${student.grade ? `Grade ${E(student.grade)}` : 'Student volunteer'}</span></div>${badge(log.status)}</div><h3>${E(event?.title || log.title || 'Community service')}</h3><p class="staff-review-description">${E(event?.location || log.organization || 'Community volunteering')}</p><dl class="staff-review-facts"><div><dt>Hours submitted</dt><dd>${hoursText(log.hours)} hours</dd></div><div><dt>Activity date</dt><dd>${E(dateText(log.date || event?.start || log.submittedAt))}</dd></div><div><dt>Attendance</dt><dd>${A(state.attendance).some(x => x.eventId === log.eventId && x.studentId === log.studentId && x.present) ? `${icon('check',14)} Confirmed` : 'Not recorded'}</dd></div></dl>${log.notes ? `<div class="staff-review-note"><span>Student notes</span><p>${E(log.notes)}</p></div>` : ''}${log.reason ? `<div class="staff-review-note returned"><span>Review note</span><p>${E(log.reason)}</p></div>` : ''}${log.status === 'pending' ? `<div class="staff-review-decision"><p>Approved hours count toward the student’s total.</p><div class="staff-action-row">${btn('Return for updates', 'return-hours', { id: log.id }, 'secondary')}${btn(`${icon('check',17)} Approve hours`, 'approve-hours', { id: log.id }, 'primary')}</div></div>` : `<div class="staff-table-note">${log.status === 'approved' ? 'Added to the student’s service total.' : 'Waiting for the student to resubmit.'}</div>`}</article>`;
+}
+
 function advisor(state) {
   const logs = A(state.serviceLogs);
   const pending = logs.filter(x => x.status === 'pending');
   const approved = logs.filter(x => x.status === 'approved');
   const returned = logs.filter(x => x.status === 'returned');
-  const shown = logs.filter(x => x.status === local.serviceTab);
-  return `${header('', 'Service hours', '')}<div class="staff-kpis">${kpi('Awaiting review', pending.length, 'Service records ready for you', 'bookmark')}${kpi('Approved hours', hoursText(approved.reduce((sum, x) => sum + Number(x.hours || 0), 0)), 'Verified across your school', 'heart')}${kpi('Students', new Set(logs.map(x => x.studentId)).size, 'Students with service records', 'users')}${kpi('Returned', returned.length, 'Students can edit and resubmit', 'reset')}</div><div class="staff-toolbar">${tabs([['pending', `Awaiting review <span class="staff-mini-count">${pending.length}</span>`], ['approved', 'Approved'], ['returned', 'Returned']], local.serviceTab, 'serviceTab')}<span class="muted" style="font-size:11px">${shown.length} record${shown.length === 1 ? '' : 's'}</span></div><div class="staff-review-grid">${shown.length ? shown.map(log => {
-    const student = studentFor(state, log.studentId); const event = eventFor(state, log.eventId);
-    return `<article class="staff-review-card"><div class="staff-review-person"><div class="avatar">${E(initials(student.name))}</div><div><strong>${E(student.name)}</strong><span>${student.grade ? `Grade ${E(student.grade)}` : 'Student volunteer'}</span></div>${badge(log.status)}</div><h3>${E(event?.title || log.title || 'Community service')}</h3><p class="staff-review-description">${E(event?.location || log.organization || 'Community volunteering')}</p><div class="staff-review-meta"><span><strong>${hoursText(log.hours)} hours</strong></span><span>${E(dateText(log.date || event?.start || log.submittedAt))}</span></div>${log.notes ? `<div class="staff-review-note">“${E(log.notes)}”</div>` : ''}${log.reason ? `<div class="staff-review-note returned"><strong>Review note:</strong> ${E(log.reason)}</div>` : ''}${log.status === 'pending' ? `<div class="staff-action-row">${btn('Return for updates', 'return-hours', { id: log.id }, 'secondary small')}${btn(`${icon('check')} Approve hours`, 'approve-hours', { id: log.id }, 'primary small')}</div>` : `<div class="staff-table-note">${log.status === 'approved' ? 'Added to the student’s service total.' : 'Waiting for the student to resubmit.'}</div>`}</article>`;
-  }).join('') : `<div class="card" style="grid-column:1/-1">${empty(local.serviceTab === 'pending' ? 'No pending records' : 'No records yet', local.serviceTab === 'pending' ? 'All submitted hours have been reviewed.' : 'Reviewed records will appear here.', 'check')}</div>`}</div>`;
+  const shown = logs.filter(x => x.status === local.serviceTab).sort((a,b) => String(b.submittedAt || '').localeCompare(String(a.submittedAt || '')) || String(a.id).localeCompare(String(b.id), undefined, { numeric: true }));
+  const page = pageOf(shown, local.servicePage, 8);
+  local.servicePage = page.page;
+  const selected = page.items.find(x => x.id === local.selectedLogId) || page.items[0];
+  local.selectedLogId = selected?.id || null;
+  const records = shown.length ? `<div class="staff-review-layout"><section class="card staff-review-list"><div class="staff-panel-heading"><h2>${local.serviceTab === 'pending' ? 'Review queue' : cap(local.serviceTab) + ' records'}</h2><span class="staff-record-count">${shown.length} total</span></div>${page.items.map(log => { const student = studentFor(state, log.studentId); const event = eventFor(state, log.eventId); return `<button type="button" class="staff-review-row ${log.id === selected?.id ? 'selected' : ''}" data-staff-action="review-record" data-id="${E(log.id)}" aria-pressed="${log.id === selected?.id}"><span class="avatar">${E(initials(student.name))}</span><span class="staff-review-row-copy"><strong>${E(student.name)}</strong><span>${E(event?.title || log.title || 'Community service')}</span><small>${E(dateText(log.date || event?.start || log.submittedAt))}</small></span><span class="staff-review-row-hours">${hoursText(log.hours)}<small>hours</small></span>${icon('chevron',17)}</button>`; }).join('')}${pager(shown.length, page.page, 8, 'servicePage', 'service records')}</section><aside aria-label="Selected service record">${serviceReviewDetail(selected,state)}</aside></div>` : `<section class="card">${empty(local.serviceTab === 'pending' ? 'No pending records' : 'No records yet', local.serviceTab === 'pending' ? 'All submitted hours have been reviewed.' : 'Reviewed records will appear here.', 'check')}</section>`;
+  return `${header('', 'Service hours', '')}<div class="staff-kpis">${kpi('Awaiting review', pending.length, '', 'bookmark')}${kpi('Approved hours', hoursText(approved.reduce((sum, x) => sum + Number(x.hours || 0), 0)), '', 'heart')}${kpi('Students', new Set(logs.map(x => x.studentId)).size, '', 'users')}${kpi('Returned', returned.length, '', 'reset')}</div><div class="staff-toolbar">${tabs([['pending', `Awaiting review <span class="staff-mini-count">${pending.length}</span>`], ['approved', 'Approved'], ['returned', 'Returned']], local.serviceTab, 'serviceTab')}</div>${records}`;
 }
 
 function partner(state, persona) {
@@ -103,23 +133,21 @@ function admin(state) {
   else if (local.adminTab === 'clubs') content = adminClubs(state);
   else if (local.adminTab === 'plan') content = businessPlan();
   else content = analytics(state);
-  return `${header('', 'School overview', '')}<div class="staff-kpis">${kpi('Participating students', participants.size, 'Unique students with activity', 'users')}${kpi('Active clubs', A(state.clubs).length, 'Places to find a community', 'compass')}${kpi('Approved hours', hoursText(approvedHours), 'Time making a difference', 'heart')}${kpi('Pending reviews', pending, 'Partner and opportunity submissions', 'bookmark')}</div><div class="staff-toolbar">${tabs([['overview', 'Overview'], ['review', `Review queue${pending ? ` <span class="staff-mini-count">${pending}</span>` : ''}`], ['clubs', 'Clubs'], ['plan', 'Business model']], local.adminTab, 'adminTab')}</div>${content}`;
+  return `${header('', 'School overview', '')}<div class="staff-kpis">${kpi('Participating students', participants.size, 'Unique students with activity', 'users')}${kpi('Active clubs', A(state.clubs).length, 'Places to find a community', 'compass')}${kpi('Approved hours', hoursText(approvedHours), 'Time making a difference', 'heart')}${kpi('Partner reviews', pending, 'Partner and opportunity submissions', 'bookmark')}</div><div class="staff-toolbar">${tabs([['overview', 'Overview'], ['review', `Review queue${pending ? ` <span class="staff-mini-count">${pending}</span>` : ''}`], ['clubs', 'Clubs'], ['plan', 'Business model']], local.adminTab, 'adminTab')}</div>${content}`;
 }
 
 function analytics(state) {
-  const clubs = A(state.clubs);
-  const memberCounts = clubs.map(c => ({ name: c.name, count: A(state.memberships).filter(m => m.clubId === c.id && m.status === 'active').length })).sort((a, b) => b.count - a.count).slice(0, 6);
+  const memberCounts = A(state.clubs).map(c => ({ name: c.name, count: A(state.memberships).filter(m => m.clubId === c.id && m.status === 'active').length })).sort((a, b) => b.count - a.count).slice(0, 6);
   const maxMembers = Math.max(1, ...memberCounts.map(x => x.count));
   const stats = [
-    ['Club memberships', A(state.memberships).filter(x => x.status === 'active').length],
-    ['Event RSVPs', A(state.rsvps).length],
-    ['Attendance records', A(state.attendance).filter(x => x.present).length],
-    ['Approved service records', A(state.serviceLogs).filter(x => x.status === 'approved').length]
+    ['Club memberships', A(state.memberships).filter(x => x.status === 'active').length, 'users'],
+    ['Event RSVPs', A(state.rsvps).length, 'calendar'],
+    ['Attendance records', A(state.attendance).filter(x => x.present).length, 'check'],
+    ['Approved service records', A(state.serviceLogs).filter(x => x.status === 'approved').length, 'heart']
   ];
-  const max = Math.max(1, ...stats.map(x => x[1]));
   const categories = [...new Set(A(state.events).filter(x => x.status === 'published').map(x => x.category))].filter(Boolean);
   const summary = categories.map(c => ({ label: c, value: A(state.events).filter(x => x.category === c && x.status === 'published').length }));
-  return `<div class="staff-analytics-grid"><section class="card staff-analytics-card"><h3>Club membership</h3><p>Top 6 clubs · Active members</p><div class="staff-chart" role="img" aria-label="Club membership counts: ${E(memberCounts.map(x => `${x.name}: ${x.count}`).join(', '))}">${memberCounts.map(x => `<div class="staff-bar-group"><span class="staff-bar-value">${x.count}</span><div class="staff-bar" style="height:${x.count / maxMembers * 135}px"></div><span class="staff-bar-label">${E(x.name.replace(' Club', ''))}</span></div>`).join('')}</div><div class="staff-analytics-foot">Students may belong to multiple clubs.</div></section><section class="card staff-analytics-card"><h3>Participation</h3><div class="staff-funnel">${stats.map(([label, value]) => `<div class="staff-funnel-row"><div><span>${E(label)}</span><strong>${value}</strong></div><div class="staff-funnel-track"><div class="staff-funnel-fill" style="width:${value / max * 100}%"></div></div></div>`).join('')}</div><div class="staff-analytics-foot">Activity counts, not unique students.</div></section><section class="card staff-analytics-card"><h3>Events by category</h3><p>Published events</p><div class="staff-funnel">${summary.length ? summary.map(({ label, value }) => `<div class="staff-funnel-row"><div><span>${E(cap(label))}</span><strong>${value} event${value === 1 ? '' : 's'}</strong></div><div class="staff-funnel-track"><div class="staff-funnel-fill" style="width:${value / Math.max(1, ...summary.map(x => x.value)) * 100}%"></div></div></div>`).join('') : empty('No published events', 'Publish an event to see it here.', 'calendar')}</div></section><section class="card staff-analytics-card"><h3>Community</h3><div class="staff-funnel">${[['Approved partners', A(state.partners).filter(x => x.status === 'approved').length], ['Published opportunities', A(state.listings).filter(x => x.status === 'published').length], ['Student service submissions', A(state.serviceLogs).length], ['Published announcements', A(state.announcements).length]].map(([label, n]) => `<div class="staff-funnel-row"><div><span>${E(label)}</span><strong>${n}</strong></div></div>`).join('')}</div></section></div>`;
+  return `<div class="staff-analytics-grid"><section class="card staff-analytics-card"><div class="staff-analytics-title"><div><h3>Club membership</h3><p>Top 6 clubs by active members</p></div>${icon('users',20)}</div><div class="staff-horizontal-chart" role="img" aria-label="Club membership counts: ${E(memberCounts.map(x => `${x.name}: ${x.count}`).join(', '))}">${memberCounts.map(x => `<div class="staff-horizontal-bar"><div><span>${E(x.name)}</span><strong>${x.count}</strong></div><div class="staff-horizontal-track"><span style="width:${x.count / maxMembers * 100}%"></span></div></div>`).join('')}</div><div class="staff-analytics-foot">Students may belong to multiple clubs.</div></section><section class="card staff-analytics-card"><div class="staff-analytics-title"><div><h3>Participation</h3><p>Activity across your school</p></div>${icon('chart',20)}</div><div class="staff-activity-totals">${stats.map(([label, value, symbol]) => `<div>${icon(symbol,19)}<strong>${value}</strong><span>${E(label)}</span></div>`).join('')}</div><div class="staff-analytics-foot">Activity counts, not unique students.</div></section><section class="card staff-analytics-card"><div class="staff-analytics-title"><div><h3>Events by category</h3><p>Published events</p></div>${icon('calendar',20)}</div><div class="staff-category-counts">${summary.length ? summary.map(({ label, value }) => `<div><span class="staff-category-dot category-${E(label.toLowerCase())}"></span><span>${E(cap(label))}</span><strong>${value}</strong><small>events</small></div>`).join('') : empty('No published events', 'Publish an event to see it here.', 'calendar')}</div></section><section class="card staff-analytics-card"><div class="staff-analytics-title"><div><h3>Community</h3><p>Partners and school content</p></div>${icon('school',20)}</div><dl class="staff-community-counts">${[['Approved partners', A(state.partners).filter(x => x.status === 'approved').length], ['Published opportunities', A(state.listings).filter(x => x.status === 'published').length], ['Student service submissions', A(state.serviceLogs).length], ['Published announcements', A(state.announcements).length]].map(([label, n]) => `<div><dt>${E(label)}</dt><dd>${n}</dd></div>`).join('')}</dl></section></div>`;
 }
 
 function adminReview(state) {
@@ -221,11 +249,22 @@ export function bindStaff(root, api) {
     try {
       if (action === 'tab') {
         const { group, value } = target.dataset;
+        if (!['organizerTab', 'serviceTab', 'adminTab'].includes(group)) return;
         local[group] = value;
+        if (group === 'serviceTab') { local.servicePage = 1; local.selectedLogId = null; }
         api.render();
         Array.from(document.querySelectorAll('[data-staff-action="tab"]')).find(button => button.dataset.group === group && button.dataset.value === value)?.focus({ preventScroll: true });
       }
-      else if (action === 'roster') { local.selectedEventId = id; api.render(); }
+      else if (action === 'page') {
+        const { group, value } = target.dataset;
+        if (!['organizerPage', 'servicePage', 'rosterPage'].includes(group)) return;
+        local[group] = Math.max(1, Number(value) || 1);
+        if (group === 'organizerPage') { local.selectedEventId = null; local.rosterPage = 1; }
+        if (group === 'servicePage') local.selectedLogId = null;
+        api.render();
+      }
+      else if (action === 'roster') { local.selectedEventId = id; local.rosterPage = 1; api.render(); }
+      else if (action === 'review-record') { local.selectedLogId = id; api.render(); }
       else if (action === 'new-event') eventForm(api);
       else if (action === 'edit-event') eventForm(api, id);
       else if (action === 'publish-event') act('publishEvent', { id }, 'Event published.');

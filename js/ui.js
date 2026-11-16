@@ -34,6 +34,13 @@ const paths = {
   edit:'<path d="m16 3 5 5L8 21H3v-5zM13 6l5 5"/>',
   trophy:'<path d="M8 3h8v8a4 4 0 0 1-8 0zM8 5H3v3a4 4 0 0 0 5 4m8-7h5v3a4 4 0 0 1-5 4m-4 3v6m-4 0h8"/>',
   print:'<path d="M6 9V3h12v6M6 18H3V9h18v9h-3M6 14h12v7H6z"/>',
+  cpu:'<rect x="6" y="6" width="12" height="12" rx="2"/><path d="M9 1v5m6-5v5M9 18v5m6-5v5M1 9h5m-5 6h5m12-6h5m-5 6h5M10 10h4v4h-4z"/>',
+  palette:'<path d="M12 3a9 9 0 1 0 0 18h1a2 2 0 0 0 0-4 2 2 0 0 1 0-4h4a4 4 0 0 0 4-4c0-3.3-4-6-9-6Z"/><path d="M7 8h.01M11 6h.01M16 7h.01M6 13h.01"/>',
+  globe:'<circle cx="12" cy="12" r="9"/><ellipse cx="12" cy="12" rx="4" ry="9"/><path d="M3 12h18M5 7h14M5 17h14"/>',
+  camera:'<path d="M8 6 9 3h6l1 3h4a1 1 0 0 1 1 1v13H3V7a1 1 0 0 1 1-1z"/><circle cx="12" cy="13" r="4"/>',
+  code:'<path d="m8 6-6 6 6 6m8-12 6 6-6 6M14 3l-4 18"/>',
+  activity:'<path d="M2 12h5l3-8 4 16 3-8h5"/>',
+  book:'<path d="M12 5c-3-2-6-2-10-1v15c4-1 7-1 10 1 3-2 6-2 10-1V4c-4-1-7-1-10 1Zm0 0v15"/>',
 };
 export function icon(name,size=20){return `<svg class="icon" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths[name]||paths.spark}</svg>`;}
 export function formatDate(value, options={month:'short',day:'numeric'}) {return new Intl.DateTimeFormat('en-US',{timeZone:'America/New_York',...options}).format(new Date(value));}

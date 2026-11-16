@@ -1,7 +1,7 @@
 import {store} from './store.js';
 import {escape,icon,formatDate,formatTime} from './ui.js';
-import {renderStudent,bindStudent,setSearch} from './student.js';
-import {renderStaff,bindStaff} from './staff.js';
+import {renderStudent,bindStudent,setSearch,resetStudentView} from './student.js';
+import {renderStaff,bindStaff,resetStaffView} from './staff.js';
 
 const app=document.querySelector('#app');
 const dialog=document.querySelector('#modal');
@@ -18,6 +18,7 @@ const staffNav={
 const schoolMark=`<span class="brand-mark">${icon('school',22)}</span>`;
 
 export function toast(message,type='success'){
+  if(present&&type!=='error')return;
   const el=document.querySelector('#toast');
   el.className=`visible ${type}`;
   el.innerHTML=`${icon(type==='error'?'info':'check',18)}<span>${escape(message)}</span>`;
@@ -68,7 +69,7 @@ function setPresentation(value){
 function resetDialog(){
   modal('Reset demo?',`<p class="body-copy">Restore the sample data? This replaces changes saved in this browser.</p><div class="modal-actions"><button class="btn secondary" data-dismiss>Cancel</button><button class="btn primary" id="confirm-reset">Reset demo</button></div>`);
   document.querySelector('#confirm-reset').onclick=()=>{
-    store.reset();location.hash='#/';closeModal();render();toast('Demo reset.');
+    resetStudentView();resetStaffView();store.reset();location.hash='#/';closeModal();render();toast('Demo reset.');
   };
 }
 function renderAccount(){
